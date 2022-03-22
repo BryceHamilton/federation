@@ -496,7 +496,7 @@ export class FederationMetadata {
     return this.sharingPredicate()(field);
   }
 
-  isFieldKey(field: FieldDefinition<any>): boolean {
+  isKeyField(field: FieldDefinition<any>): boolean {
     return this.keysPredicate()(field);
   }
 
@@ -586,8 +586,7 @@ export class FederationMetadata {
     ];
     return this.isFed2Schema()
       ? baseDirectives
-        .concat(this.shareableDirective())
-        .concat(this.overrideDirective())
+        .concat(this.shareableDirective(), this.overrideDirective())
       : baseDirectives;
   }
 

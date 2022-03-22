@@ -298,7 +298,7 @@ describe("composition involving @override directive", () => {
     };
 
     const result = composeAsFed2Subgraphs([subgraph1, subgraph2]);
-    // TODO: This test really should not cause the shareable hint to be raised, but to fix it would be a bit of a pain, so punting
+    // TODO: This test really should not cause the shareable error to be raised, but to fix it would be a bit of a pain, so punting
     // for now
     expect(result.errors?.length).toBe(3);
     expect(result.errors).toBeDefined();

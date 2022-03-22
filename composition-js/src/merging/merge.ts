@@ -697,17 +697,8 @@ class Merger {
   private mergeObject(sources: (ObjectType | undefined)[], dest: ObjectType) {
     const isEntity = this.hintOnInconsistentEntity(sources, dest);
     const isValueType = !isEntity && !dest.isRootType();
-    const typeOverriddenInSubgraphs = sources
-      .map((src, idx) => {
-        const overrideDirective = src?.appliedDirectivesOf(this.metadata(idx).overrideDirective()).pop();
-        return overrideDirective?.arguments()?.from;
-      })
-      .filter(subgraph => subgraph !== undefined);
 
-    const filteredSources = sources
-      .filter((_src, idx) => !typeOverriddenInSubgraphs.includes(this.names[idx]));
-
-    this.addFieldsShallow(filteredSources, dest);
+    this.addFieldsShallow(sources, dest);
     if (!dest.hasFields()) {
       // This can happen for a type that existing in the subgraphs but had only non-merged fields
       // (currently, this can only be the 'Query' type, in the rare case where the federated schema
@@ -716,9 +707,9 @@ class Merger {
     } else {
       for (const destField of dest.fields()) {
         if (isValueType) {
-          this.hintOnInconsistentValueTypeField(filteredSources, dest, destField);
+          this.hintOnInconsistentValueTypeField(sources, dest, destField);
         }
-        const subgraphFields = filteredSources.map(t => t?.field(destField.name));
+        const subgraphFields = sources.map(t => t?.field(destField.name));
         const filteredFields = this.validateOverride(subgraphFields, destField);
 
         this.mergeField(filteredFields, destField);
@@ -833,11 +824,11 @@ class Merger {
     return this.metadata(sourceIdx).isFieldShareable(field);
   }
 
-  private isFieldKey(sourceIdx: number, field: FieldDefinition<any> | undefined): boolean {
+  private isKeyField(sourceIdx: number, field: FieldDefinition<any> | undefined): boolean {
     if (!field) {
       return false;
     }
-    return this.metadata(sourceIdx).isFieldKey(field);
+    return this.metadata(sourceIdx).isKeyField(field);
   }
 
   private getOverrideDirective(sourceIdx: number, field: FieldDefinition<any>): Directive<any> | undefined {
@@ -845,28 +836,10 @@ class Merger {
     const metadata = this.metadata(sourceIdx);
     const overrideDirective = metadata.isFed2Schema() ? metadata.overrideDirective() : undefined;
     const allFieldOverrides = overrideDirective ? field.appliedDirectivesOf(overrideDirective) : [];
-    return allFieldOverrides.find(d => d.ofExtension() === field.ofExtension());
-
-    // TODO: commenting out since we don't support override on type just yet. Will be added back shortly
-    /*
-    const type = field.parent;
-    assert(type, 'Field must have a parent');
-    const allTypeOverrides: Directive<any>[] = overrideDirective ? type.appliedDirectivesOf(overrideDirective) : [];
-    const overrideOnType = allTypeOverrides.find((d) => d.ofExtension() === type.ofExtension);
-
-    // if both directives are present, raise an error
-    if (overrideOnField && overrideOnType) {
-      this.errors.push(ERRORS.OVERRIDE_ON_BOTH_FIELD_AND_TYPE.err({
-        message: `Field "${field.coordinate}" on subgraph "${this.names[sourceIdx]}" is marked with @override directive on both the field and the type`,
-      }));
-    } else if (overrideOnField || overrideOnType) {
-      return overrideOnField ?? overrideOnType; // only one of them is not undefined, but this will return the one we want
-    }
-    return undefined;
-    */
+    return allFieldOverrides[0]; // if array is empty, will return undefined
   }
 
-  private overrideHasIncompatibleFields({
+  private overrideConflictsWithOtherDirective({
     idx,
     field,
     subgraphName,
@@ -887,11 +860,7 @@ class Merger {
         return false;
       }
       const directives = field.appliedDirectivesOf(def);
-      const directiveOnField = directives.find(d => d.ofExtension() === field.ofExtension());
-      const directivesOnType: Directive<any>[] = field.parent.appliedDirectivesOf(def);
-      const directiveOnType = directivesOnType.find(d => d.ofExtension() === field.parent.ofExtension);
-
-      return !!directiveOnField || !!directiveOnType;
+      return directives.length > 0;
     };
 
     const fromMetadata = this.metadata(fromIdx);
@@ -1000,7 +969,7 @@ class Merger {
         // check to make sure that there is no conflicting @key, @provides, or @requires directives
         const fromIdx = this.names.indexOf(sourceSubgraphName);
         const fromField = sources[fromIdx];
-        const { result: hasIncompatible, conflictingDirective, subgraph } = this.overrideHasIncompatibleFields({
+        const { result: hasIncompatible, conflictingDirective, subgraph } = this.overrideConflictsWithOtherDirective({
           idx: subgraphMap[subgraphName].idx,
           field: sources[subgraphMap[subgraphName].idx],
           subgraphName,
@@ -1015,7 +984,7 @@ class Merger {
         } else {
           // if we get here, then the @override directive is valid
           // if the field being overridden is a key, then we need to add an @external directive
-          if (this.isFieldKey(fromIdx, sources[fromIdx])) {
+          if (this.isKeyField(fromIdx, sources[fromIdx])) {
             fromField?.applyDirective(this.metadata(fromIdx).externalDirective());
           } else {
             // only ignore subgraph if we're not adding an @external directive

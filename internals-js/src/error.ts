@@ -323,7 +323,7 @@ const OVERRIDE_ON_BOTH_FIELD_AND_TYPE = makeCodeDefinition(
 
 const OVERRIDE_COLLISION_WITH_ANOTHER_DIRECTIVE = makeCodeDefinition(
   'OVERRIDE_COLLISION_WITH_ANOTHER_DIRECTIVE',
-  'Override cannot be used in conjunction with specific other directives.',
+  'The @override directive cannot be used on external fields, nor to override fields with either @external, @provides, or @requires.',
 );
 
 export const ERROR_CATEGORIES = {
