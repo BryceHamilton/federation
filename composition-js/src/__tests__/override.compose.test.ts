@@ -432,6 +432,102 @@ describe("composition involving @override directive", () => {
     ]);
   });
 
+  it("override with @provides on overridden field", () => {
+    const subgraph1 = {
+      name: "Subgraph1",
+      url: "https://Subgraph1",
+      typeDefs: gql`
+        type Query {
+          t: T
+        }
+
+        type T @key(fields: "k") {
+          k: ID
+          u: U @override(from: "Subgraph2")
+        }
+
+        type U @key(fields: "id") {
+          id: ID
+          name: String
+        }
+      `,
+    };
+
+    const subgraph2 = {
+      name: "Subgraph2",
+      url: "https://Subgraph2",
+      typeDefs: gql`
+        type T @key(fields: "k"){
+          k: ID
+          u: U @provides(fields: "name")
+        }
+
+        extend type U @key(fields: "id") {
+          id: ID
+          name: String @external
+        }
+      `,
+    };
+
+    const result = composeAsFed2Subgraphs([subgraph1, subgraph2]);
+    // expect(result.errors?.length).toBe(1);
+    expect(result.errors).toBeDefined();
+    expect(errors(result)).toContainEqual(
+      [
+        "OVERRIDE_COLLISION_WITH_ANOTHER_DIRECTIVE",
+        `@override cannot be used on field "T.u" on subgraph "Subgraph1" since "T.u" on "Subgraph1" is marked with directive "@provides"`,
+      ],
+    );
+  });
+
+  it("override with @requires on overridden field", () => {
+    const subgraph1 = {
+      name: "Subgraph1",
+      url: "https://Subgraph1",
+      typeDefs: gql`
+        type Query {
+          t: T
+        }
+
+        type T @key(fields: "k") {
+          k: ID
+          id: ID
+          u: U @override(from: "Subgraph2")
+        }
+
+        type U @key(fields: "id") {
+          id: ID
+        }
+      `,
+    };
+
+    const subgraph2 = {
+      name: "Subgraph2",
+      url: "https://Subgraph2",
+      typeDefs: gql`
+        type T @key(fields: "k"){
+          k: ID
+          id: ID @external
+          u: U @requires(fields: "id")
+        }
+
+        extend type U @key(fields: "id") {
+          id: ID
+        }
+      `,
+    };
+
+    const result = composeAsFed2Subgraphs([subgraph1, subgraph2]);
+    // expect(result.errors?.length).toBe(1);
+    expect(result.errors).toBeDefined();
+    expect(errors(result)).toContainEqual(
+      [
+        "OVERRIDE_COLLISION_WITH_ANOTHER_DIRECTIVE",
+        `@override cannot be used on field "T.u" on subgraph "Subgraph1" since "T.u" on "Subgraph1" is marked with directive "@requires"`,
+      ],
+    );
+  });
+
   it("override with @external on overriding field", () => {
     const subgraph1 = {
       name: "Subgraph1",

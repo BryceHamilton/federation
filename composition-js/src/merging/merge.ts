@@ -854,17 +854,8 @@ class Merger {
     fromField: FieldDefinition<any> | undefined;
     fromSubgraphName: string;
   }): { result: boolean, conflictingDirective?: string, subgraph?: string } {
-    // helper function to let us know if a given directive exists on a field
-    const directiveOnField = (field: FieldDefinition<any> | undefined, def: DirectiveDefinition<any> | undefined): boolean => {
-      if (!def || !field) {
-        return false;
-      }
-      const directives = field.appliedDirectivesOf(def);
-      return directives.length > 0;
-    };
-
     const fromMetadata = this.metadata(fromIdx);
-    if (directiveOnField(fromField, fromMetadata.providesDirective())) {
+    if (fromField?.hasAppliedDirective(fromMetadata.providesDirective())) {
       return {
         result: true,
         conflictingDirective: fromMetadata.providesDirective().name,
@@ -872,7 +863,7 @@ class Merger {
       };
     }
 
-    if (directiveOnField(fromField, fromMetadata.requiresDirective())) {
+    if (fromField?.hasAppliedDirective(fromMetadata.requiresDirective())) {
       return {
         result: true,
         conflictingDirective: fromMetadata.requiresDirective().name,
