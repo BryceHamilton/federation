@@ -75,13 +75,16 @@ describe('printSubgraphSchema', () => {
         id: ID!
         name: String @external
         userAccount(id: ID! = 1): User @requires(fields: \\"name\\")
+        description: String
       }
       "
     `);
   });
 
   it('prints a scalar without a directive correctly', () => {
-    const schema = gql`scalar JSON`;
+    const schema = gql`
+      scalar JSON
+    `;
     const subgraphSchema = buildSubgraphSchema(schema);
 
     expect(printSubgraphSchema(subgraphSchema)).toMatchInlineSnapshot(`
