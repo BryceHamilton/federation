@@ -72,6 +72,7 @@ export class JoinSpecDefinition extends FeatureDefinition {
     if (!this.isV01()) {
       joinField.addArgument('type', schema.stringType());
       joinField.addArgument('external', schema.booleanType());
+      joinField.addArgument('override', schema.stringType());
     }
 
     if (!this.isV01()) {
@@ -144,6 +145,7 @@ export class JoinSpecDefinition extends FeatureDefinition {
     graph: string,
     requires?: string,
     provides?: string,
+    override?: string,
     type?: string,
     external?: boolean,
   }> {

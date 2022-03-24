@@ -338,7 +338,7 @@ function validateAllExternalFieldsUsed(metadata: FederationMetadata, errorCollec
       continue;
     }
     for (const field of type.fields()) {
-      if (!metadata.isFieldExternal(field) || allUsedExternals.has(field.coordinate)) {
+      if (!metadata.isFieldExternal(field) || allUsedExternals.has(field.coordinate) || metadata.isSyntheticExternal(field)) {
         continue;
       }
 
@@ -432,6 +432,7 @@ export class FederationMetadata {
   private _externalTester?: ExternalTester;
   private _sharingPredicate?: (field: FieldDefinition<CompositeType>) => boolean;
   private _keysPredicate?: (field: FieldDefinition<CompositeType>) => boolean;
+  private _syntheticExternals: Set<string> = new Set();
   private _isFed2Schema?: boolean;
 
   constructor(readonly schema: Schema) {
@@ -498,6 +499,14 @@ export class FederationMetadata {
 
   isKeyField(field: FieldDefinition<any>): boolean {
     return this.keysPredicate()(field);
+  }
+
+  addSyntheticExternal(coordinate: string) {
+    this._syntheticExternals.add(coordinate);
+  }
+
+  isSyntheticExternal(field: FieldDefinition<any>): boolean {
+    return this._syntheticExternals.has(field.coordinate);
   }
 
   federationDirectiveNameInSchema(name: string): string {

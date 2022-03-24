@@ -41,7 +41,7 @@ describe("composition involving @override directive", () => {
     const result = composeAsFed2Subgraphs([subgraph1, subgraph2]);
     assertCompositionSuccess(result);
 
-    const typeT = result.schema.type('T');
+    const typeT = result.schema.type("T");
     expect(printType(typeT!)).toMatchInlineSnapshot(`
       "type T
         @join__type(graph: SUBGRAPH1, key: \\"k\\")
@@ -85,14 +85,14 @@ describe("composition involving @override directive", () => {
     const result = composeAsFed2Subgraphs([subgraph1, subgraph2]);
     assertCompositionSuccess(result);
 
-    const typeT = result.schema.type('T');
+    const typeT = result.schema.type("T");
     expect(printType(typeT!)).toMatchInlineSnapshot(`
       "type T
         @join__type(graph: SUBGRAPH1, key: \\"k\\")
         @join__type(graph: SUBGRAPH2, key: \\"k\\")
       {
         k: ID
-        a: Int @join__field(graph: SUBGRAPH1)
+        a: Int @join__field(graph: SUBGRAPH1, override: \\"Subgraph2\\") @join__field(graph: SUBGRAPH2, external: true)
         b: Int @join__field(graph: SUBGRAPH2)
       }"
     `);
@@ -264,13 +264,13 @@ describe("composition involving @override directive", () => {
     const result = composeAsFed2Subgraphs([subgraph1, subgraph2]);
     assertCompositionSuccess(result);
 
-    const typeT = result.schema.type('T');
+    const typeT = result.schema.type("T");
     expect(printType(typeT!)).toMatchInlineSnapshot(`
       "type T
         @join__type(graph: SUBGRAPH1, key: \\"k\\")
         @join__type(graph: SUBGRAPH2, key: \\"k\\")
       {
-        k: ID @join__field(graph: SUBGRAPH1) @join__field(graph: SUBGRAPH2, external: true)
+        k: ID @join__field(graph: SUBGRAPH1, override: \\"Subgraph2\\") @join__field(graph: SUBGRAPH2, external: true)
         a: Int @join__field(graph: SUBGRAPH1)
         b: Int @join__field(graph: SUBGRAPH2)
       }"
@@ -307,7 +307,7 @@ describe("composition involving @override directive", () => {
     const result = composeAsFed2Subgraphs([subgraph1, subgraph2]);
     assertCompositionSuccess(result);
 
-    const typeT = result.schema.type('T');
+    const typeT = result.schema.type("T");
     expect(printType(typeT!)).toMatchInlineSnapshot(`
       "type T
         @join__type(graph: SUBGRAPH1, key: \\"k\\")
@@ -370,19 +370,19 @@ describe("composition involving @override directive", () => {
     const result = composeAsFed2Subgraphs([subgraph1, subgraph2]);
     assertCompositionSuccess(result);
 
-    const typeE = result.schema.type('E');
+    const typeE = result.schema.type("E");
     expect(printType(typeE!)).toMatchInlineSnapshot(`
       "type E
         @join__type(graph: SUBGRAPH1)
         @join__type(graph: SUBGRAPH2)
       {
-        k: ID @join__field(graph: SUBGRAPH1) @join__field(graph: SUBGRAPH2, external: true)
+        k: ID @join__field(graph: SUBGRAPH1, override: \\"Subgraph2\\") @join__field(graph: SUBGRAPH2, external: true)
         a: Int @join__field(graph: SUBGRAPH1)
         b: Int @join__field(graph: SUBGRAPH2)
       }"
     `);
 
-    const typeT = result.schema.type('T');
+    const typeT = result.schema.type("T");
     expect(printType(typeT!)).toMatchInlineSnapshot(`
       "type T
         @join__type(graph: SUBGRAPH1, key: \\"e { k }\\")
@@ -457,7 +457,7 @@ describe("composition involving @override directive", () => {
       name: "Subgraph2",
       url: "https://Subgraph2",
       typeDefs: gql`
-        type T @key(fields: "k"){
+        type T @key(fields: "k") {
           k: ID
           u: U @provides(fields: "name")
         }
@@ -472,12 +472,10 @@ describe("composition involving @override directive", () => {
     const result = composeAsFed2Subgraphs([subgraph1, subgraph2]);
     // expect(result.errors?.length).toBe(1);
     expect(result.errors).toBeDefined();
-    expect(errors(result)).toContainEqual(
-      [
-        "OVERRIDE_COLLISION_WITH_ANOTHER_DIRECTIVE",
-        `@override cannot be used on field "T.u" on subgraph "Subgraph1" since "T.u" on "Subgraph1" is marked with directive "@provides"`,
-      ],
-    );
+    expect(errors(result)).toContainEqual([
+      "OVERRIDE_COLLISION_WITH_ANOTHER_DIRECTIVE",
+      `@override cannot be used on field "T.u" on subgraph "Subgraph1" since "T.u" on "Subgraph1" is marked with directive "@provides"`,
+    ]);
   });
 
   it("override with @requires on overridden field", () => {
@@ -505,7 +503,7 @@ describe("composition involving @override directive", () => {
       name: "Subgraph2",
       url: "https://Subgraph2",
       typeDefs: gql`
-        type T @key(fields: "k"){
+        type T @key(fields: "k") {
           k: ID
           id: ID @external
           u: U @requires(fields: "id")
@@ -520,12 +518,10 @@ describe("composition involving @override directive", () => {
     const result = composeAsFed2Subgraphs([subgraph1, subgraph2]);
     // expect(result.errors?.length).toBe(1);
     expect(result.errors).toBeDefined();
-    expect(errors(result)).toContainEqual(
-      [
-        "OVERRIDE_COLLISION_WITH_ANOTHER_DIRECTIVE",
-        `@override cannot be used on field "T.u" on subgraph "Subgraph1" since "T.u" on "Subgraph1" is marked with directive "@requires"`,
-      ],
-    );
+    expect(errors(result)).toContainEqual([
+      "OVERRIDE_COLLISION_WITH_ANOTHER_DIRECTIVE",
+      `@override cannot be used on field "T.u" on subgraph "Subgraph1" since "T.u" on "Subgraph1" is marked with directive "@requires"`,
+    ]);
   });
 
   it("override with @external on overriding field", () => {
@@ -557,11 +553,9 @@ describe("composition involving @override directive", () => {
 
     const result = composeAsFed2Subgraphs([subgraph1, subgraph2]);
     expect(result.errors).toBeDefined();
-    expect(errors(result)).toContainEqual(
-      [
-        "OVERRIDE_COLLISION_WITH_ANOTHER_DIRECTIVE",
-        `@override cannot be used on field "T.k" on subgraph "Subgraph1" since "T.k" on "Subgraph1" is marked with directive "@external"`,
-      ],
-    );
+    expect(errors(result)).toContainEqual([
+      "OVERRIDE_COLLISION_WITH_ANOTHER_DIRECTIVE",
+      `@override cannot be used on field "T.k" on subgraph "Subgraph1" since "T.k" on "Subgraph1" is marked with directive "@external"`,
+    ]);
   });
 });

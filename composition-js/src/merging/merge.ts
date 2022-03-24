@@ -710,10 +710,10 @@ class Merger {
           this.hintOnInconsistentValueTypeField(sources, dest, destField);
         }
         const subgraphFields = sources.map(t => t?.field(destField.name));
-        const filteredFields = this.validateOverride(subgraphFields, destField);
+        this.validateOverride(subgraphFields, destField);
 
-        this.mergeField(filteredFields, destField);
-        this.validateFieldSharing(filteredFields, destField);
+        this.mergeField(subgraphFields, destField);
+        this.validateFieldSharing(subgraphFields, destField);
       }
     }
   }
@@ -824,13 +824,6 @@ class Merger {
     return this.metadata(sourceIdx).isFieldShareable(field);
   }
 
-  private isKeyField(sourceIdx: number, field: FieldDefinition<any> | undefined): boolean {
-    if (!field) {
-      return false;
-    }
-    return this.metadata(sourceIdx).isKeyField(field);
-  }
-
   private getOverrideDirective(sourceIdx: number, field: FieldDefinition<any>): Directive<any> | undefined {
     // Check the directive on the field, then on the enclosing type.
     const metadata = this.metadata(sourceIdx);
@@ -892,7 +885,7 @@ class Merger {
    * return a list of subgraphs to ignore for the current field
    * return value is a list of fields that has been filtered to ignore overridden fields
    */
-  private validateOverride(sources: FieldOrUndefinedArray, { coordinate }: FieldDefinition<any>): FieldOrUndefinedArray {
+  private validateOverride(sources: FieldOrUndefinedArray, { coordinate }: FieldDefinition<any>) {
     // For any field, we can't have more than one @override directive
     type MappedValue = {
       idx: number,
@@ -905,7 +898,6 @@ class Merger {
       subgraphMap: { [key: string]: MappedValue },
     };
 
-    const subgraphsToIgnore: string[] = [];
     // convert sources to a map so we don't have to keep scanning through the array to find a source
     const { subgraphsWithOverride, subgraphMap } = sources.map((source, idx) => {
       if (!source) {
@@ -941,7 +933,6 @@ class Merger {
           `Source subgraph "${sourceSubgraphName}" for field "${coordinate}" on subgraph "${subgraphName}" does not exist.${extraMsg}`,
           coordinate,
         ));
-        subgraphsToIgnore.push(sourceSubgraphName);
       } else if (sourceSubgraphName === subgraphName) {
         this.errors.push(ERRORS.OVERRIDE_FROM_SELF_ERROR.err({
           message: `Source and destination subgraphs "${sourceSubgraphName}" are the same for overridden field "${coordinate}"`,
@@ -956,7 +947,6 @@ class Merger {
           `Field "${coordinate}" on subgraph "${subgraphName}" no longer exists in the from subgraph. The @override directive can be removed.`,
           coordinate,
         ));
-        subgraphsToIgnore.push(sourceSubgraphName);
       } else {
         // check to make sure that there is no conflicting @key, @provides, or @requires directives
         const fromIdx = this.names.indexOf(sourceSubgraphName);
@@ -976,12 +966,8 @@ class Merger {
         } else {
           // if we get here, then the @override directive is valid
           // if the field being overridden is a key, then we need to add an @external directive
-          if (this.isKeyField(fromIdx, sources[fromIdx])) {
-            fromField?.applyDirective(this.metadata(fromIdx).externalDirective());
-          } else {
-            // only ignore subgraph if we're not adding an @external directive
-            subgraphsToIgnore.push(sourceSubgraphName);
-          }
+          assert(fromField, 'fromField should not be undefined');
+          fromField.applyDirective(this.metadata(fromIdx).externalDirective());
           this.hints.push(new CompositionHint(
             hintOverriddenFieldCanBeRemoved,
             `Field "${coordinate}" on subgraph "${sourceSubgraphName}" is overridden. Consider removing it.`,
@@ -990,7 +976,6 @@ class Merger {
         }
       }
     });
-    return sources.map((source, idx) => (!source || subgraphsToIgnore.includes(this.names[idx])) ? undefined : source);
   }
 
   private mergeField(sources: FieldOrUndefinedArray, dest: FieldDefinition<any>) {
@@ -1184,6 +1169,7 @@ class Merger {
         graph: name,
         requires: this.getFieldSet(source, sourceMeta.requiresDirective()),
         provides: this.getFieldSet(source, sourceMeta.providesDirective()),
+        override: this.getOverrideFieldSet(source, sourceMeta.overrideDirective()),
         type: allTypesEqual ? undefined : source.type?.toString(),
         external: external ? true : undefined,
       });
@@ -1194,6 +1180,12 @@ class Merger {
     const applications = element.appliedDirectivesOf(directive);
     assert(applications.length <= 1, () => `Found more than one application of ${directive} on ${element}`);
     return applications.length === 0 ? undefined : applications[0].arguments().fields;
+  }
+
+  private getOverrideFieldSet(element: SchemaElement<any, any>, directive: DirectiveDefinition<{from: string}>): string | undefined {
+    const applications = element.appliedDirectivesOf(directive);
+    assert(applications.length <= 1, () => `Found more than one application of ${directive} on ${element}`);
+    return applications.length === 0 ? undefined : applications[0].arguments().from;
   }
 
   // Returns `true` if the type references were all completely equal and `false` if some subtyping happened (or
