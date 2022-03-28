@@ -258,21 +258,21 @@ function validateAllFieldSet<TParent extends SchemaElement<any, any>>(
   }
 }
 
-export function collectUsedExternalFieldsCoordinates(metadata: FederationMetadata): Set<string> {
-  const usedExternalCoordinates = new Set<string>();
+export function collectUsedFields(metadata: FederationMetadata): Set<FieldDefinition<CompositeType>> {
+  const usedFields = new Set<FieldDefinition<CompositeType>>();
 
   // Collects all external fields used by a key, requires or provides
   collectUsedExternaFieldsForDirective<CompositeType>(
     metadata,
     metadata.keyDirective(),
     type => type,
-    usedExternalCoordinates,
+    usedFields,
   );
   collectUsedExternaFieldsForDirective<FieldDefinition<CompositeType>>(
     metadata,
     metadata.requiresDirective(),
     field => field.parent!,
-    usedExternalCoordinates,
+    usedFields,
   );
   collectUsedExternaFieldsForDirective<FieldDefinition<CompositeType>>(
     metadata,
@@ -281,7 +281,7 @@ export function collectUsedExternalFieldsCoordinates(metadata: FederationMetadat
       const type = baseType(field.type!);
       return isCompositeType(type) ? type : undefined;
     },
-    usedExternalCoordinates,
+    usedFields,
   );
 
   // Collects all external fields used to satisfy an interface constraint
@@ -291,20 +291,20 @@ export function collectUsedExternalFieldsCoordinates(metadata: FederationMetadat
       for (const runtimeType of runtimeTypes) {
         const implemField = runtimeType.field(field.name);
         if (implemField && metadata.isFieldExternal(implemField)) {
-          usedExternalCoordinates.add(implemField.coordinate);
+          usedFields.add(implemField);
         }
       }
     }
   }
 
-  return usedExternalCoordinates;
+  return usedFields;
 }
 
 function collectUsedExternaFieldsForDirective<TParent extends SchemaElement<any, any>>(
   metadata: FederationMetadata,
   definition: DirectiveDefinition<{fields: any}>,
   targetTypeExtractor: (element: TParent) => CompositeType | undefined,
-  usedExternalCoordinates: Set<string>
+  usedExternalCoordinates: Set<FieldDefinition<CompositeType>>
 ) {
   for (const application of definition.applications()) {
     const type = targetTypeExtractor(application.parent! as TParent);
@@ -323,7 +323,7 @@ function collectUsedExternaFieldsForDirective<TParent extends SchemaElement<any,
       includeInterfaceFieldsImplementations: true,
       validate: false,
     }).filter((field) => metadata.isFieldExternal(field))
-      .forEach((field) => usedExternalCoordinates.add(field.coordinate));
+      .forEach((field) => usedExternalCoordinates.add(field));
   }
 }
 
@@ -332,13 +332,12 @@ function collectUsedExternaFieldsForDirective<TParent extends SchemaElement<any,
  * interface implementation. Otherwise, the field declaration is somewhat useless.
  */
 function validateAllExternalFieldsUsed(metadata: FederationMetadata, errorCollector: GraphQLError[]): void {
-  const allUsedExternals = collectUsedExternalFieldsCoordinates(metadata);
   for (const type of metadata.schema.types()) {
     if (!isObjectType(type) && !isInterfaceType(type)) {
       continue;
     }
     for (const field of type.fields()) {
-      if (!metadata.isFieldExternal(field) || allUsedExternals.has(field.coordinate) || metadata.isSyntheticExternal(field)) {
+      if (!metadata.isFieldExternal(field) || metadata.isFieldUsed(field)) {
         continue;
       }
 
@@ -432,7 +431,7 @@ export class FederationMetadata {
   private _externalTester?: ExternalTester;
   private _sharingPredicate?: (field: FieldDefinition<CompositeType>) => boolean;
   private _keysPredicate?: (field: FieldDefinition<CompositeType>) => boolean;
-  private _syntheticExternals: Set<string> = new Set();
+  private _fieldUsedPredicate?: (field: FieldDefinition<CompositeType>) => boolean;
   private _isFed2Schema?: boolean;
 
   constructor(readonly schema: Schema) {
@@ -443,6 +442,7 @@ export class FederationMetadata {
     this._sharingPredicate = undefined;
     this._keysPredicate = undefined;
     this._isFed2Schema = undefined;
+    this._fieldUsedPredicate = undefined;
   }
 
   isFed2Schema(): boolean {
@@ -473,6 +473,18 @@ export class FederationMetadata {
     return this._keysPredicate;
   }
 
+  private fieldUsedPredicate(): (field: FieldDefinition<CompositeType>) => boolean {
+    if (!this._fieldUsedPredicate) {
+      const usedFields = Array.from(collectUsedFields(this));
+      this._fieldUsedPredicate = (field: FieldDefinition<CompositeType>) => !!usedFields.find((f) => f.coordinate === field.coordinate);
+    }
+    return this._fieldUsedPredicate;
+  }
+
+  isFieldUsed(field: FieldDefinition<CompositeType>): boolean {
+    return this.fieldUsedPredicate()(field);
+  }
+
   isFieldExternal(field: FieldDefinition<any> | InputFieldDefinition) {
     return this.externalTester().isExternal(field);
   }
@@ -499,14 +511,6 @@ export class FederationMetadata {
 
   isKeyField(field: FieldDefinition<any>): boolean {
     return this.keysPredicate()(field);
-  }
-
-  addSyntheticExternal(coordinate: string) {
-    this._syntheticExternals.add(coordinate);
-  }
-
-  isSyntheticExternal(field: FieldDefinition<any>): boolean {
-    return this._syntheticExternals.has(field.coordinate);
   }
 
   federationDirectiveNameInSchema(name: string): string {

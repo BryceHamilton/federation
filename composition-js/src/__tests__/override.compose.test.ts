@@ -92,7 +92,7 @@ describe("composition involving @override directive", () => {
         @join__type(graph: SUBGRAPH2, key: \\"k\\")
       {
         k: ID
-        a: Int @join__field(graph: SUBGRAPH1, override: \\"Subgraph2\\") @join__field(graph: SUBGRAPH2, external: true)
+        a: Int @join__field(graph: SUBGRAPH1, override: \\"Subgraph2\\")
         b: Int @join__field(graph: SUBGRAPH2)
       }"
     `);
@@ -314,7 +314,7 @@ describe("composition involving @override directive", () => {
         @join__type(graph: SUBGRAPH2, key: \\"k\\")
       {
         k: ID
-        a: Int @join__field(graph: SUBGRAPH1)
+        a: Int @join__field(graph: SUBGRAPH1, override: \\"Subgraph2\\")
       }"
     `);
 

@@ -180,13 +180,6 @@ export function extractSubgraphsFromSupergraph(supergraph: Schema): Subgraphs {
               if (args.external) {
                 subgraphField.applyDirective(subgraph.metadata().externalDirective());
               }
-              if (args.override) {
-                subgraphField.applyDirective(subgraph.metadata().overrideDirective(), {'from': args.override});
-                const overriddenSubgraph = subgraphs.get(args.override);
-                if (overriddenSubgraph) {
-                  overriddenSubgraph.metadata().addSyntheticExternal(subgraphField.coordinate);
-                }
-              }
             }
           }
         }

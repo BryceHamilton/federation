@@ -710,10 +710,10 @@ class Merger {
           this.hintOnInconsistentValueTypeField(sources, dest, destField);
         }
         const subgraphFields = sources.map(t => t?.field(destField.name));
-        this.validateOverride(subgraphFields, destField);
+        const filteredFields = this.validateOverride(subgraphFields, destField);
 
-        this.mergeField(subgraphFields, destField);
-        this.validateFieldSharing(subgraphFields, destField);
+        this.mergeField(filteredFields, destField);
+        this.validateFieldSharing(filteredFields, destField);
       }
     }
   }
@@ -918,6 +918,7 @@ class Merger {
       return acc;
     }, { subgraphsWithOverride: [], subgraphMap: {} });
 
+    const overriddenSubgraphs: number[] = [];
     // for each subgraph that has an @override directive, check to see if any errors or hints should be surfaced
     subgraphsWithOverride.forEach((subgraphName) => {
       const { overrideDirective } = subgraphMap[subgraphName];
@@ -965,9 +966,13 @@ class Merger {
           }));
         } else {
           // if we get here, then the @override directive is valid
-          // if the field being overridden is a key, then we need to add an @external directive
+          // if the field being overridden is used, then we need to add an @external directive
           assert(fromField, 'fromField should not be undefined');
-          fromField.applyDirective(this.metadata(fromIdx).externalDirective());
+          if (this.metadata(fromIdx).isFieldUsed(fromField) || this.metadata(fromIdx).isKeyField(fromField)) {
+            fromField.applyDirective(this.metadata(fromIdx).externalDirective());
+          } else {
+            overriddenSubgraphs.push(fromIdx);
+          }
           this.hints.push(new CompositionHint(
             hintOverriddenFieldCanBeRemoved,
             `Field "${coordinate}" on subgraph "${sourceSubgraphName}" is overridden. Consider removing it.`,
@@ -976,6 +981,8 @@ class Merger {
         }
       }
     });
+
+    return sources.map((source, idx) => overriddenSubgraphs.includes(idx) ? undefined : source);
   }
 
   private mergeField(sources: FieldOrUndefinedArray, dest: FieldDefinition<any>) {
